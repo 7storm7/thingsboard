@@ -41,7 +41,8 @@ Vagrant.configure("2") do |config|
   # the path on the host to the actual folder. The second argument is
   # the path on the guest to mount the folder. And the optional third
   # argument is a set of non-required options.
-  config.vm.synced_folder "./data", "/vagrant_data"
+  config.vm.synced_folder "./vagarnt_data", "/data"
+  config.vm.synced_folder "./eclipse_workspace", "/workspace"
 
   # Provider-specific configuration so you can fine-tune various
   # backing providers for Vagrant. These expose provider-specific options.
@@ -52,7 +53,7 @@ Vagrant.configure("2") do |config|
      vb.gui = true
   #
   #   # Customize the amount of memory on the VM:
-     vb.memory = "4096"
+     vb.memory = "8192"
    end
   #
   # View the documentation for the provider you are using for more
@@ -69,12 +70,15 @@ Vagrant.configure("2") do |config|
   # Puppet, Chef, Ansible, Salt, and Docker are also available. Please see the
   # documentation for more information about their specific syntax and use.
    config.vm.provision "shell", inline: <<-SHELL
-     TARGET_PATH=/opt
-     REPO_PATH=$TARGET_PATH/thingsboard/ 
+     export TARGET_PATH="/opt"
+     REPO_PATH="$TARGET_PATH/thingsboard"
      echo "Target Path: $TARGET_PATH"
      echo "Repo Path: $REPO_PATH"
+
+     echo "Path: ${PATH}"
+
      yum update
-     yum -y install java-1.8.0-openjdk
+     yum -y install java-1.8.0-openjdk-devel
      update-alternatives --config java
      update-alternatives --config javac
      yum -y install git
@@ -84,10 +88,10 @@ Vagrant.configure("2") do |config|
      wget http://mirror.idealhosting.net.tr/Apache/maven/maven-3/3.3.9/binaries/apache-maven-3.3.9-bin.tar.gz
      tar xzf apache-maven-3.3.9-bin.tar.gz
      sudo ln -s apache-maven-3.3.9 maven
-     echo "export M2_HOME=${TARGER_PATH}/maven" >> /etc/profile.d/maven.sh
-     echo "export PATH=${M2_HOME}/bin:${PATH}" >> /etc/profile.d/maven.sh
+     echo "export M2_HOME=$TARGET_PATH/maven" > /etc/profile.d/maven.sh
+     echo "export PATH=$M2_HOME/bin:${PATH}" >> /etc/profile.d/maven.sh
      source /etc/profile.d/maven.sh
-     git clone -b git-clone-url-update https://github.com/7storm7/thingsboard.git $REPO_PATH 
+     git clone -b git-clone-url-update https://github.com/7storm7/thingsboard.git ${REPO_PATH} 
      cd $REPO_PATH     
      mvn clean install  
 
@@ -134,5 +138,20 @@ Vagrant.configure("2") do |config|
 
 
      service thingsboard restart
+
+     #Installing  XFCE4 as XServer
+     apt-get install -y xfce4 virtualbox-guest-dkms virtualbox-guest-utils virtualbox-guest-x11
+     apt-get install gnome-icon-theme-full tango-icon-theme
+     echo “allowed_users=anybody” > /etc/X11/Xwrapper.config
+     echo “LANG=en_US.UTF-8” >> /etc/environment
+     echo “LANGUAGE=en_US.UTF-8” >> /etc/environment
+     echo “LC_ALL=en_US.UTF-8” >> /etc/environment
+     echo “LC_CTYPE=en_US.UTF-8” >> /etc/environment
+     wget -O /opt/eclipse-java-neon-2-linux-gtk-x86_64.tar.gz http://ftp.fau.de/eclipse/technology/epp/downloads/release/neon/2/eclipse-java-neon-2-linux-gtk-x86_64.tar.gz
+     cd /opt/ && tar -zxvf eclipse-java-neon-2-linux-gtk-x86_64.tar.gz
+     WORKSPACE_LOC="/" 
+
+
+     startxfce4&
    SHELL
 end
