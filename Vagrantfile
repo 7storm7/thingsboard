@@ -69,20 +69,26 @@ Vagrant.configure("2") do |config|
   # Puppet, Chef, Ansible, Salt, and Docker are also available. Please see the
   # documentation for more information about their specific syntax and use.
    config.vm.provision "shell", inline: <<-SHELL
+     TARGET_PATH=/opt
+     REPO_PATH=$TARGET_PATH/thingsboard/ 
+     echo "Target Path: $TARGET_PATH"
+     echo "Repo Path: $REPO_PATH"
      yum update
      yum -y install java-1.8.0-openjdk
      update-alternatives --config java
      update-alternatives --config javac
-     cd /opt
+     yum -y install git
+     #Git protocol may be blocked by firewall  
+     git config --global url."https://".insteadOf git://
+     cd $TARGET_PATH
      wget http://mirror.idealhosting.net.tr/Apache/maven/maven-3/3.3.9/binaries/apache-maven-3.3.9-bin.tar.gz
      tar xzf apache-maven-3.3.9-bin.tar.gz
      sudo ln -s apache-maven-3.3.9 maven
-     echo "export M2_HOME=/opt/maven" >> /etc/profile.d/maven.sh
+     echo "export M2_HOME=${TARGER_PATH}/maven" >> /etc/profile.d/maven.sh
      echo "export PATH=${M2_HOME}/bin:${PATH}" >> /etc/profile.d/maven.sh
      source /etc/profile.d/maven.sh
-     yum -y install git
-     git clone -b git-clone-url-update https://github.com/7storm7/thingsboard.git 
-     cd thingsboard     
+     git clone -b git-clone-url-update https://github.com/7storm7/thingsboard.git $REPO_PATH 
+     cd $REPO_PATH     
      mvn clean install  
 
      touch /etc/yum.repos.d/datastax.repo 
@@ -96,17 +102,37 @@ Vagrant.configure("2") do |config|
      # Tools installation
      yum install -y cassandra30-tools
      # Start Cassandra
-     service cassandra start
+     CSSNDR_SERVICE="cassandra"
+     service $CSSNDR_SERVICE restart
      # Configure the database to start automatically when OS starts.
      chkconfig cassandra on
 
-     rpm -Uvh /opt/thingsboard/application/target/thingsboard.rpm
+     rpm -Uvh --replacepkgs $REPO_PATH/application/target/thingsboard.rpm
+    
+     while ((`ps -ef | grep -v grep | grep $CSSNDR_SERVICE | wc -l` < 1)) 
+     do
+       echo "...donuyorum..."
+     done     
+ 
+     cqlsh -f /usr/share/thingsboard/data/schema.cql > /dev/null 2>&1
+     while [ $? -ne 0 ]; do
+        cqlsh -f /usr/share/thingsboard/data/schema.cql > /dev/null 2>&1
+     done 
+     echo "<cqlsh -f /usr/share/thingsboard/data/schema.cql> : OK"	
 
-     cqlsh -f /usr/share/thingsboard/data/schema.cql
-     cqlsh -f /usr/share/thingsboard/data/system-data.cql
-     cqlsh -f /usr/share/thingsboard/data/demo-data.cql
-     
-     
-     service thingsboard start
+     cqlsh -f /usr/share/thingsboard/data/system-data.cql > /dev/null 2>&1
+     while [ $? -ne 0 ]; do
+        cqlsh -f /usr/share/thingsboard/data/system-data.cql > /dev/null 2>&1
+     done 
+     echo "<cqlsh -f /usr/share/thingsboard/data/system-data.cql> : OK"	
+
+     cqlsh -f /usr/share/thingsboard/data/demo-data.cql > /dev/null 2>&1
+     while [ $? -ne 0 ]; do
+        cqlsh -f /usr/share/thingsboard/data/demo-data.cql > /dev/null 2>&1
+     done 
+     echo "<cqlsh -f /usr/share/thingsboard/data/demo-data.cql> : OK"	
+
+
+     service thingsboard restart
    SHELL
 end
