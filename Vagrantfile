@@ -42,7 +42,7 @@ Vagrant.configure("2") do |config|
   # the path on the guest to mount the folder. And the optional third
   # argument is a set of non-required options.
   config.vm.synced_folder "./vagrant_data", "/data", create: true
-  config.vm.synced_folder "./eclipse_workspace", "/workspace", create: true
+  config.vm.synced_folder "./ide_workspace", "/workspace", create: true
 
   # Provider-specific configuration so you can fine-tune various
   # backing providers for Vagrant. These expose provider-specific options.
@@ -78,39 +78,67 @@ Vagrant.configure("2") do |config|
 
      echo "Path: ${PATH}"
 
+     echo "********Installing JDK**********"
      yum update
      yum -y install java-1.8.0-openjdk-devel
      update-alternatives --config java
      update-alternatives --config javac
 
-     wget -O /opt/eclipse-java-neon-2-linux-gtk-x86_64.tar.gz http://ftp.fau.de/eclipse/technology/epp/downloads/release/neon/2/eclipse-java-neon-2-linux-gtk-x86_64.tar.gz
-     cd /opt/ && tar -zxvf eclipse-java-neon-2-linux-gtk-x86_64.tar.gz
+     echo "....loading tr keys"
+     loadkeys tr
 
-     yum install -y setxkbmap
-     setxkbmap -rules evdev -model pc105 -layout tr -variant intl
+     echo "********Installing IDE**********"
+     IDE_NAME="idea-IC-163.12024.16"
+     IDE_ARCHIVE="ideaIC-2016.3.4-no-jdk.tar.gz"
+     echo $IDE_ARCHIVE
+     if [ ! -f /data/$IDE_ARCHIVE ]; then	
+	wget -O /data/ideaIC-2016.3.4-no-jdk.tar.gz https://download.jetbrains.com/idea/$IDE_ARCHIVE
+     fi
+     tar xfz /data/ideaIC-2016.3.4-no-jdk.tar.gz -C /data
+     echo "moving /data/$IDE_NAME /opt"
+     mv /data/$IDE_NAME /opt
+     echo "linking -sf /opt/$IDE_NAME/ /opt/idea"
+     ln -sf /opt/$IDE_NAME/ /opt/idea
+     ln -sf /opt/idea/bin/idea.sh /usr/bin/idea
 
 
+#     Since there is a project nesting problem in eclipse, we decided to use intellij idea
+#     wget -O /opt/eclipse-java-neon-2-linux-gtk-x86_64.tar.gz http://ftp.fau.de/eclipse/technology/epp/downloads/release/neon/2/eclipse-java-neon-2-linux-gtk-x86_64.tar.gz
+#     cd /opt/ && tar -zxvf eclipse-java-neon-2-linux-gtk-x86_64.tar.gz
+
+
+     echo "********Installing  XFCE4 as XServer**********"
      #Installing  XFCE4 as XServer
      yum install epel-release -y
      yum groupinstall xfce -y
+     yum -y install dkms
      yum -y groupinstall "X Window System"
      echo “allowed_users=anybody” > /etc/X11/Xwrapper.config
      echo “LANG=en_US.UTF-8” >> /etc/environment
      echo “LANGUAGE=en_US.UTF-8” >> /etc/environment
      echo “LC_ALL=en_US.UTF-8” >> /etc/environment
      echo “LC_CTYPE=en_US.UTF-8” >> /etc/environment
+
+     #yum install -y setxkbmap
+     #setxkbmap -rules evdev -model pc105 -layout tr -variant intl
+
      #startxfce4&
 
+     echo "********Installing  git**********"
      yum -y install git
      #Git protocol may be blocked by firewall  
      git config --global url."https://".insteadOf git://
+
+     echo "********Installing  maven**********"
      cd $TARGET_PATH
      wget http://mirror.idealhosting.net.tr/Apache/maven/maven-3/3.3.9/binaries/apache-maven-3.3.9-bin.tar.gz
      tar xzf apache-maven-3.3.9-bin.tar.gz
-     sudo ln -s apache-maven-3.3.9 maven
+     ln -s apache-maven-3.3.9 maven
      echo "export M2_HOME=$TARGET_PATH/maven" > /etc/profile.d/maven.sh
      echo "export PATH=\\\$M2_HOME/bin:$PATH" >> /etc/profile.d/maven.sh
      source /etc/profile.d/maven.sh
+
+     echo "********Clonning source**********"
      git clone -b git-clone-url-update https://github.com/7storm7/thingsboard.git $REPO_PATH 
      #git clone https://github.com/thingsboard/thingsboard.git
      cd $REPO_PATH 
@@ -118,13 +146,13 @@ Vagrant.configure("2") do |config|
      #mvn clean
      mvn clean install  
 
+     echo "********Installing Cassandra**********"
      touch /etc/yum.repos.d/datastax.repo 
      echo '[datastax]' | sudo tee --append /etc/yum.repos.d/datastax.repo > /dev/null
      echo 'name = DataStax Repo for Apache Cassandra' | sudo tee --append /etc/yum.repos.d/datastax.repo > /dev/null
      echo 'baseurl = http://rpm.datastax.com/community' | sudo tee --append /etc/yum.repos.d/datastax.repo > /dev/null
      echo 'enabled = 1' | sudo tee --append /etc/yum.repos.d/datastax.repo > /dev/null
      echo 'gpgcheck = 0' | sudo tee --append /etc/yum.repos.d/datastax.repo > /dev/null
-
      yum install -y dsc30
      # Tools installation
      yum install -y cassandra30-tools
@@ -138,9 +166,11 @@ Vagrant.configure("2") do |config|
     
      while ((`ps -ef | grep -v grep | grep $CSSNDR_SERVICE | wc -l` < 1)) 
      do
-       echo "...donuyorum..."
+       echo "   Waiting for Cassandra service..."
      done     
  
+
+     echo "********Installing Cassandra DB schemas**********"
      cqlsh -f /usr/share/thingsboard/data/schema.cql > /dev/null 2>&1
      while [ $? -ne 0 ]; do
         cqlsh -f /usr/share/thingsboard/data/schema.cql > /dev/null 2>&1
