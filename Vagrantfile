@@ -170,30 +170,46 @@ Vagrant.configure("2") do |config|
      do
        echo "   Waiting for Cassandra service..."
      done     
+
+     #To get rid of the error "org.apache.cassandra.io.FSWriteError: java.io.IOException: Invalid argument ..." due to the shared folder problem of virtualbox
+     #the files in shared folder temporarily copied to a local folder     
+     #Ref: http://stackoverflow.com/questions/26856235/startup-cassandra-in-standalone-failed-with-fswriteerror
+     
+
+     TMP_DIR="/tmp/silcql"
+     mkdir $TMP_DIR  
+     
+     cp $REPO_PATH/dao/src/main/resources/schema.cql $TMP_DIR
+     cp $REPO_PATH/dao/src/main/resources/system-data.cql $TMP_DIR
+     cp $REPO_PATH/dao/src/main/resources/demo-data.cql $TMP_DIR
  
+     chown cassandra:cassandra $TMP_DIR
 
      echo "********Installing Cassandra DB schemas**********"
-     cqlsh -f /usr/share/thingsboard/data/schema.cql > /dev/null 2>&1
+     cqlsh -f $TMP_DIR/schema.cql > /dev/null 2>&1
      while [ $? -ne 0 ]; do
-        cqlsh -f $REPO_PATH/dao/src/main/resources/schema.cql > /dev/null 2>&1
+        cqlsh -f $TMP_DIR/schema.cql > /dev/null 2>&1
      done 
-     echo "<cqlsh -f $REPO_PATH/dao/src/main/resources/schema.cql> : OK"	
+     echo "<cqlsh -f $TMP_DIR/schema.cql> : OK"	
 
-     cqlsh -f $REPO_PATH/dao/src/main/resources/system-data.cql > /dev/null 2>&1
+     cqlsh -f $TMP_DIR/system-data.cql > /dev/null 2>&1
      while [ $? -ne 0 ]; do
-        cqlsh -f $REPO_PATH/dao/src/main/resources/system-data.cql > /dev/null 2>&1
+        cqlsh -f $TMP_DIR/system-data.cql > /dev/null 2>&1
      done 
-     echo "<cqlsh -f $REPO_PATH/dao/src/main/resources/system-data.cql> : OK"	
+     echo "<cqlsh -f $TMP_DIR/system-data.cql> : OK"	
 
-     cqlsh -f $REPO_PATH/dao/src/main/resources/demo-data.cql > /dev/null 2>&1
+     cqlsh -f $TMP_DIR/demo-data.cql > /dev/null 2>&1
      while [ $? -ne 0 ]; do
-        cqlsh -f $REPO_PATH/dao/src/main/resources/demo-data.cql > /dev/null 2>&1
+        cqlsh -f $TMP_DIR/demo-data.cql > /dev/null 2>&1
      done 
-     echo "<cqlsh -f $REPO_PATH/dao/src/main/resources/demo-data.cql> : OK"	
+     echo "<cqlsh -f $TMP_DIR/demo-data.cql> : OK"	
+    
+     rm -rf $TMP_DIR
 
      cd $REPO_PATH 
      #!! IMPORTANT: Sometimes mvn clean install gives such an error and build fails: "Unknown lifecycle phase "X". You must specify a valid lifecycle phase or a goal in the format <plugin-prefix>:<goal> or <plugin-group> ..." If happens, comment out mvn clean command below to clean the problem
      #mvn clean
+     echo "Maven installing"
      mvn clean install -U  
 
      echo "....loading tr keys"
